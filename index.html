@@ -441,6 +441,15 @@ function loadFromApi(){
     audio.play().then(function(){setOn(true);},function(){toast('No se pudo reproducir la música. Revisá que el archivo exista');});
   });
   $('.acts').prepend(btn);
+  /* Los navegadores no dejan sonar solos: arranca con el primer toque o tecla en la página. */
+  if(list.length&&window.BRC_AUTOPLAY!==false){
+    var auto=function(e){
+      document.removeEventListener('click',auto,true);document.removeEventListener('keydown',auto,true);
+      if(on||player||btn.contains(e.target))return;
+      btn.click();
+    };
+    document.addEventListener('click',auto,true);document.addEventListener('keydown',auto,true);
+  }
 })();
 
 /* ---------- arranque ---------- */
