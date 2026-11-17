@@ -2,7 +2,7 @@
 
 /* Firmas automáticas: pegá entre las comillas la dirección de tu Google Apps Script (termina en /exec).
    Mientras esté vacío, las firmas se mandan con un código por WhatsApp. */
-window.BRC_API="";
+window.BRC_API="https://script.google.com/macros/s/AKfycbxf5wYq54Ox58EfVj-MiPFx1ezP3OOI9xl7CVYLc6w07hxOqLjBtZzxwtGkkn-loJw3/exec";
 
 /* Música, opción A: un archivo de audio que subas al repositorio, al lado de index.html.
    Ejemplo: window.BRC_MUSICA="musica.mp3"; */
