@@ -66,7 +66,24 @@ button,input,textarea{font:inherit;color:inherit}
 #toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top,0px));z-index:40;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px)}
 a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 
-.yt{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));width:220px;height:220px;border:0;border-radius:12px;z-index:25;box-shadow:0 6px 24px rgba(0,0,0,.35);background:#000}
+
+.mp{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));width:min(340px,calc(100% - 24px));z-index:25;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.3);padding:8px;display:flex;flex-direction:column;gap:6px}
+.mpv{height:180px;overflow:hidden;border-radius:8px;background:#000}
+.mpv iframe{display:block;width:100%;height:180px;border:0}
+.mp.min .mpv{height:0}
+.mpr{display:flex;align-items:center;gap:6px}
+.mpb{border:0;background:transparent;color:var(--ink);width:40px;height:40px;border-radius:50%;display:grid;place-items:center;cursor:pointer;flex:none}
+.mpb:hover{background:var(--bg)}
+.mpp{background:var(--accent);color:var(--on-accent)}
+.mpp:hover{background:var(--accent);filter:brightness(1.08)}
+.mpt{flex:1;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.mps{flex:1;min-width:0;accent-color:var(--accent)}
+.mpv2{width:70px;flex:none;accent-color:var(--accent)}
+.splash{position:fixed;inset:0;z-index:60;background:var(--bg);display:grid;place-items:center;padding:24px}
+.splash-in{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;max-width:420px}
+.splash h2{margin:0;font:800 clamp(30px,8vw,46px)/1.05 var(--f-display);color:var(--accent);text-wrap:balance}
+.splash p{margin:0 0 8px;color:var(--muted)}
+.splash .btn.primary{font-size:18px;padding:14px 28px}
 </style>
 </head>
 <body>
@@ -385,15 +402,42 @@ function loadFromApi(){
     if(n)render();}).catch(function(){});
 }
 
-/* ---------- música (opcional, se configura en config.js) ---------- */
+/* ---------- música + reproductor (se configura en config.js) ---------- */
 (function(){
   var list=(window.BRC_PLAYLIST||[]).filter(function(x){return x&&x.id;}),
       yt=(window.BRC_YOUTUBE||'').trim(),file=(window.BRC_MUSICA||'').trim();
   if(!list.length&&yt){var m=yt.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/)||yt.match(/^([A-Za-z0-9_-]{11})$/);if(m)list=[{id:m[1]}];}
-  if(!list.length&&!file)return;
-  var btn=mk('button','btn','Poner música'),on=false,audio=null,player=null,idx=0,apiP=null,fails=0;btn.type='button';
-  btn.setAttribute('aria-pressed','false');
-  function setOn(v){on=v;btn.textContent=v?'Pausar música':'Poner música';btn.setAttribute('aria-pressed',String(v));}
+  var useYT=list.length>0;
+  if(!useYT&&!file)return;
+  function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
+  function ic(d){return '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><path d="'+d+'"/></svg>';}
+  var I={prev:'M6 6h2v12H6zM9.5 12 18 6v12z',next:'M16 6h2v12h-2zM6 18V6l8.5 6z',play:'M8 5v14l11-7z',pause:'M6 5h4v14H6zM14 5h4v14h-4z',down:'M7 10l5 5 5-5z',up:'M7 14l5-5 5 5z'};
+
+  /* ----- interfaz ----- */
+  var mp=el('div','mp'),mpv=el('div','mpv'),vslot=el('div'),row=el('div','mpr'),
+      bPrev=el('button','mpb'),bPlay=el('button','mpb mpp'),bNext=el('button','mpb'),bVid=el('button','mpb'),
+      tt=el('div','mpt','Música'),prog=el('input','mps'),vol=el('input','mpv2');
+  [bPrev,bPlay,bNext,bVid].forEach(function(b){b.type='button';});
+  bPrev.innerHTML=ic(I.prev);bPrev.setAttribute('aria-label','Canción anterior');
+  bNext.innerHTML=ic(I.next);bNext.setAttribute('aria-label','Canción siguiente');
+  bPlay.innerHTML=ic(I.play);bPlay.setAttribute('aria-label','Reproducir');
+  bVid.setAttribute('aria-label','Mostrar u ocultar el video');
+  prog.type='range';prog.min=0;prog.max=1000;prog.value=0;prog.setAttribute('aria-label','Avance de la canción');
+  vol.type='range';vol.min=0;vol.max=100;vol.value=60;vol.setAttribute('aria-label','Volumen');
+  mpv.append(vslot);
+  var top=el('div','mpr');top.append(bPrev,bPlay,bNext,tt,bVid);
+  var low=el('div','mpr');low.append(prog,vol);
+  mp.append(top,low);
+  if(useYT){mp.prepend(mpv);}else{bVid.hidden=true;}
+  var collapsed=window.innerWidth<600;
+  function setCollapsed(v){collapsed=v;mp.classList.toggle('min',v);bVid.innerHTML=ic(v?I.up:I.down);}
+  setCollapsed(collapsed);
+  bVid.addEventListener('click',function(){setCollapsed(!collapsed);});
+  document.body.append(mp);
+
+  /* ----- estado ----- */
+  var on=false,player=null,audio=null,idx=0,apiP=null,fails=0,timer=0,lastNext=0;
+  function setOn(v){on=v;bPlay.innerHTML=ic(v?I.pause:I.play);bPlay.setAttribute('aria-label',v?'Pausar':'Reproducir');}
   function api(){
     if(apiP)return apiP;
     apiP=new Promise(function(ok,no){
@@ -401,54 +445,82 @@ function loadFromApi(){
       var prev=window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady=function(){if(prev)prev();ok();};
       var s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';s.onerror=no;document.head.append(s);
-      setTimeout(no,12000);
+      setTimeout(no,15000);
     });
     return apiP;
   }
   function item(){var t=list[idx%list.length];return {videoId:t.id,startSeconds:t.start||0,endSeconds:t.end||undefined};}
-  function next(){idx=(idx+1)%list.length;player.loadVideoById(item());}
+  function go(i){idx=(i+list.length)%list.length;fails=0;lastNext=Date.now();prog.value=0;tt.textContent='Cargando…';player.loadVideoById(item());}
+  function next(){if(Date.now()-lastNext<1500)return;go(idx+1);}
+  function cur(){try{return player.getCurrentTime()||0;}catch(e){return 0;}}
+  function tick(){
+    if(!player||!player.getCurrentTime)return;
+    var it=item(),c=cur(),d=it.endSeconds||player.getDuration()||0,s=it.startSeconds;
+    if(it.endSeconds&&c>=it.endSeconds-.2){next();return;}
+    if(d>s&&document.activeElement!==prog)prog.value=Math.max(0,Math.min(1000,(c-s)/(d-s)*1000));
+  }
+  function title(){
+    var n=(idx%list.length)+1,t='';
+    try{t=(player.getVideoData()||{}).title||'';}catch(e){}
+    tt.textContent=n+'/'+list.length+(t?' · '+t:'');tt.title=t;
+  }
   function startYT(){
-    var box=document.createElement('div');box.className='yt';var inner=document.createElement('div');box.append(inner);document.body.append(box);
     var it=item();
-    player=new YT.Player(inner,{
-      host:'https://www.youtube-nocookie.com',width:'220',height:'220',videoId:it.videoId,
+    player=new YT.Player(vslot,{
+      host:'https://www.youtube-nocookie.com',width:'100%',height:'180',videoId:it.videoId,
       playerVars:{autoplay:1,playsinline:1,rel:0,start:it.startSeconds,end:it.endSeconds},
       events:{
-        onReady:function(e){e.target.playVideo();},
+        onReady:function(e){e.target.setVolume(+vol.value);e.target.playVideo();},
         onStateChange:function(e){
-          if(e.data===0){fails=0;next();}
-          else if(e.data===1){fails=0;setOn(true);}
-          else if(e.data===2&&on&&!btn._pausing){/* pausa desde el reproductor */setOn(false);}
+          if(e.data===0){next();}
+          else if(e.data===1){fails=0;setOn(true);title();clearInterval(timer);timer=setInterval(tick,400);}
+          else if(e.data===2){setOn(false);}
         },
-        onError:function(){fails++;if(fails>=list.length){toast('No se pudo reproducir la música');setOn(false);}else next();}
+        onError:function(){fails++;if(fails>=list.length){tt.textContent='No se pudo reproducir';setOn(false);toast('No se pudo reproducir la música');}else{lastNext=0;next();}}
       }
     });
-    player.box=box;
   }
-  btn.addEventListener('click',function(){
-    if(on){
-      if(player){btn._pausing=true;player.pauseVideo();setTimeout(function(){btn._pausing=false;},400);}
-      if(audio)audio.pause();
-      setOn(false);return;
-    }
-    if(list.length){
+  function play(){
+    if(useYT){
       if(player&&player.playVideo){player.playVideo();setOn(true);return;}
       setOn(true);
-      api().then(startYT,function(){setOn(false);toast('No se pudo cargar la música. Revisá la conexión');});
+      api().then(function(){if(!player)startYT();},function(){setOn(false);toast('No se pudo cargar la música. Revisá la conexión');});
       return;
     }
-    if(!audio){audio=new Audio(file);audio.loop=true;audio.volume=.6;}
-    audio.play().then(function(){setOn(true);},function(){toast('No se pudo reproducir la música. Revisá que el archivo exista');});
+    if(!audio){audio=new Audio(file);audio.loop=true;audio.volume=+vol.value/100;
+      audio.addEventListener('timeupdate',function(){if(audio.duration&&document.activeElement!==prog)prog.value=audio.currentTime/audio.duration*1000;});
+      tt.textContent='Música del libro';}
+    audio.play().then(function(){setOn(true);},function(){setOn(false);toast('No se pudo reproducir la música. Revisá que el archivo exista');});
+  }
+  function pause(){if(useYT){if(player&&player.pauseVideo)player.pauseVideo();}else if(audio)audio.pause();setOn(false);}
+  bPlay.addEventListener('click',function(){on?pause():play();});
+  bNext.addEventListener('click',function(){if(useYT){if(!player){idx=(idx+1)%list.length;play();}else{lastNext=0;next();}}});
+  bPrev.addEventListener('click',function(){
+    if(useYT){
+      if(!player){idx=(idx-1+list.length)%list.length;play();return;}
+      var s=item().startSeconds;
+      if(cur()-s>3){player.seekTo(s,true);}else{lastNext=0;go(idx-1);}
+    }else if(audio){audio.currentTime=0;}
   });
-  $('.acts').prepend(btn);
-  /* Los navegadores no dejan sonar solos: arranca con el primer toque o tecla en la página. */
-  if(list.length&&window.BRC_AUTOPLAY!==false){
-    var auto=function(e){
-      document.removeEventListener('click',auto,true);document.removeEventListener('keydown',auto,true);
-      if(on||player||btn.contains(e.target))return;
-      btn.click();
-    };
-    document.addEventListener('click',auto,true);document.addEventListener('keydown',auto,true);
+  prog.addEventListener('input',function(){
+    var f=prog.value/1000;
+    if(useYT&&player&&player.getDuration){var it=item(),d=it.endSeconds||player.getDuration()||0;if(d>it.startSeconds)player.seekTo(it.startSeconds+f*(d-it.startSeconds),true);}
+    else if(audio&&audio.duration){audio.currentTime=f*audio.duration;}
+  });
+  vol.addEventListener('input',function(){var v=+vol.value;if(player&&player.setVolume)player.setVolume(v);if(audio)audio.volume=v/100;});
+  if(useYT)api().catch(function(){});
+
+  /* ----- pantalla de entrada: el toque de "Abrir el libro" permite que suene ----- */
+  if(window.BRC_AUTOPLAY!==false){
+    var sp=el('div','splash'),box=el('div','splash-in'),h=el('h2',null,'BRC Baile Inolvidable'),
+        p=el('p',null,'Bariloche 2026 · La banda del Capi'),go1=el('button','btn primary','Abrir el libro  ♪'),
+        no=el('button','btn ghost small','Entrar sin música');
+    go1.type=no.type='button';
+    box.append(h,p,go1,no);sp.append(box);sp.setAttribute('role','dialog');sp.setAttribute('aria-label','Entrada al libro');
+    document.body.append(sp);
+    go1.addEventListener('click',function(){sp.remove();play();});
+    no.addEventListener('click',function(){sp.remove();});
+    go1.focus();
   }
 })();
 
