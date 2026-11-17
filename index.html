@@ -387,23 +387,55 @@ function loadFromApi(){
 
 /* ---------- música (opcional, se configura en config.js) ---------- */
 (function(){
-  var file=(window.BRC_MUSICA||'').trim(),yt=(window.BRC_YOUTUBE||'').trim(),id='';
-  if(yt){var m=yt.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/)||yt.match(/^([A-Za-z0-9_-]{11})$/);id=m?m[1]:'';}
-  if(!file&&!id)return;
-  var btn=mk('button','btn','Poner música'),on=false,audio=null,frame=null;btn.type='button';
+  var list=(window.BRC_PLAYLIST||[]).filter(function(x){return x&&x.id;}),
+      yt=(window.BRC_YOUTUBE||'').trim(),file=(window.BRC_MUSICA||'').trim();
+  if(!list.length&&yt){var m=yt.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/)||yt.match(/^([A-Za-z0-9_-]{11})$/);if(m)list=[{id:m[1]}];}
+  if(!list.length&&!file)return;
+  var btn=mk('button','btn','Poner música'),on=false,audio=null,player=null,idx=0,apiP=null,fails=0;btn.type='button';
   btn.setAttribute('aria-pressed','false');
   function setOn(v){on=v;btn.textContent=v?'Pausar música':'Poner música';btn.setAttribute('aria-pressed',String(v));}
+  function api(){
+    if(apiP)return apiP;
+    apiP=new Promise(function(ok,no){
+      if(window.YT&&window.YT.Player)return ok();
+      var prev=window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady=function(){if(prev)prev();ok();};
+      var s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';s.onerror=no;document.head.append(s);
+      setTimeout(no,12000);
+    });
+    return apiP;
+  }
+  function item(){var t=list[idx%list.length];return {videoId:t.id,startSeconds:t.start||0,endSeconds:t.end||undefined};}
+  function next(){idx=(idx+1)%list.length;player.loadVideoById(item());}
+  function startYT(){
+    var box=document.createElement('div');box.className='yt';var inner=document.createElement('div');box.append(inner);document.body.append(box);
+    var it=item();
+    player=new YT.Player(inner,{
+      host:'https://www.youtube-nocookie.com',width:'220',height:'220',videoId:it.videoId,
+      playerVars:{autoplay:1,playsinline:1,rel:0,start:it.startSeconds,end:it.endSeconds},
+      events:{
+        onReady:function(e){e.target.playVideo();},
+        onStateChange:function(e){
+          if(e.data===0){fails=0;next();}
+          else if(e.data===1){fails=0;setOn(true);}
+          else if(e.data===2&&on&&!btn._pausing){/* pausa desde el reproductor */setOn(false);}
+        },
+        onError:function(){fails++;if(fails>=list.length){toast('No se pudo reproducir la música');setOn(false);}else next();}
+      }
+    });
+    player.box=box;
+  }
   btn.addEventListener('click',function(){
     if(on){
+      if(player){btn._pausing=true;player.pauseVideo();setTimeout(function(){btn._pausing=false;},400);}
       if(audio)audio.pause();
-      if(frame){frame.remove();frame=null;}
       setOn(false);return;
     }
-    if(id){
-      frame=document.createElement('iframe');frame.className='yt';frame.title='Música del libro';
-      frame.allow='autoplay; encrypted-media';
-      frame.src='https://www.youtube-nocookie.com/embed/'+id+'?autoplay=1&loop=1&playlist='+id+'&playsinline=1';
-      document.body.append(frame);setOn(true);return;
+    if(list.length){
+      if(player&&player.playVideo){player.playVideo();setOn(true);return;}
+      setOn(true);
+      api().then(startYT,function(){setOn(false);toast('No se pudo cargar la música. Revisá la conexión');});
+      return;
     }
     if(!audio){audio=new Audio(file);audio.loop=true;audio.volume=.6;}
     audio.play().then(function(){setOn(true);},function(){toast('No se pudo reproducir la música. Revisá que el archivo exista');});
