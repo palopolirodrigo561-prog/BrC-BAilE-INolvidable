@@ -12,7 +12,8 @@ window.BRC_PLAYLIST=[
   {id:"kLBld4rQvUM"},
   {id:"qrGc5ZUhHys"},
   {id:"myW8YuosTq4"},
-  {id:"zgdl59zOANQ"}
+  {id:"zgdl59zOANQ"},
+  {id:"HhL2cFn1hF3usGE3"},
 ];
 
 /* Alternativas (se usan solo si BRC_PLAYLIST está vacía):
