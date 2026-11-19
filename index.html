@@ -8,7 +8,7 @@
 html{box-sizing:border-box}
 body{margin:0}
 [hidden]{display:none!important}
-/* Layout: las hojas del Canva apiladas, firma encima; barra de acciones fija abajo. */
+
 :root{
   --bg:#ebe5d8; --surface:#faf6ee; --ink:#2b2620; --muted:#6a6155; --line:#d6ccba;
   --accent:#a8481f; --on-accent:#fffaf3; --focus:#1f5fbf; --sheet:#fffdf7;
@@ -68,7 +68,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 
 .yt{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));width:220px;height:220px;border:0;border-radius:12px;z-index:25;box-shadow:0 6px 24px rgba(0,0,0,.35);background:#000}
 
-/* la foto se acerca */
+
 .page{touch-action:manipulation}
 body.placing .page{cursor:crosshair}
 .pzbg{position:fixed;inset:0;z-index:50;background:rgba(10,8,6,0);transition:background .35s ease;touch-action:none;cursor:zoom-out}
@@ -80,6 +80,17 @@ body.placing .page{cursor:crosshair}
 .yt{width:208px;height:117px}
 .yt iframe{width:100%;height:100%;border:0;border-radius:12px;display:block}
 .yt.off{opacity:0;pointer-events:none}
+
+.mbar{position:fixed;top:0;left:0;right:0;z-index:22;padding:max(8px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px));pointer-events:none}
+.mbar .in{pointer-events:auto;max-width:960px;margin:0 auto;display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px 4px 4px;box-shadow:0 4px 16px rgba(0,0,0,.22)}
+.mbar button{width:40px;height:40px;flex:0 0 auto;border-radius:50%;border:0;background:transparent;color:var(--ink);cursor:pointer;display:grid;place-items:center;padding:0}
+.mbar button.pp{background:var(--accent);color:var(--on-accent)}
+.mbar svg{display:block}
+.mbar .tt{flex:1 1 auto;min-width:0;margin:0 6px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.mbar .vol{display:flex;align-items:center;gap:6px;flex:0 0 auto;color:var(--muted)}
+.mbar input[type=range]{width:68px;accent-color:var(--accent)}
+.ytoff{position:fixed;left:-400px;top:0;width:200px;height:200px;opacity:0;pointer-events:none}
+body.hasbar #app{padding-top:calc(72px + env(safe-area-inset-top,0px))}
 </style>
 </head>
 <body>
@@ -148,7 +159,7 @@ body.placing .page{cursor:crosshair}
 <script>
 (function(){
 'use strict';
-/* Lo que se republica: los nodos autorales tal como llegaron, con el estado nuevo. */
+
 var SRC=[].slice.call(document.querySelectorAll('[data-src]')).map(function(n){return {id:n.id||'',html:n.outerHTML};});
 var NS='http://www.w3.org/2000/svg',W=1000,H=773;
 var $=function(s,r){return (r||document).querySelector(s);};
@@ -167,7 +178,7 @@ var toastT=0;
 function toast(t){var e=$('#toast');e.textContent=t;e.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){e.hidden=true;},3500);}
 function label(p){return LABELS[p]||('Página '+(p+1));}
 
-/* ---------- páginas ---------- */
+
 function sigSvg(m,full){
   var s=sv('svg',{viewBox:'0 0 1000 '+m.vh,width:full?'100%':m.w*W,height:full?'100%':m.w*m.vh,preserveAspectRatio:'xMidYMid meet'});
   s.append(sv('path',{d:m.d,fill:'none',stroke:m.c,'stroke-width':11,'stroke-linecap':'round','stroke-linejoin':'round'}));
@@ -399,43 +410,65 @@ function loadFromApi(){
     if(n)render();}).catch(function(){});
 }
 
-/* ---------- música: lista de YouTube (BRC_PLAYLIST en config.js) ---------- */
+/* ---------- música: barra con la lista de YouTube (BRC_PLAYLIST en config.js) ---------- */
 (function(){
   var raw=window.BRC_PLAYLIST;if(!Array.isArray(raw))return;
   var L=raw.filter(function(t){return t&&/^[A-Za-z0-9_-]{11}$/.test(String(t.id||''));});
   if(!L.length)return;
-  var auto=window.BRC_AUTOPLAY!==false,i=0,player=null,ready=false,want=false,playing=false,userPaused=false,started=false,errs=0,failed=false;
-  var btn=mk('button','btn','Poner música');btn.type='button';btn.setAttribute('aria-pressed','false');
-  var box=mk('div','yt off'),slot=mk('div');slot.id='ytslot';box.append(slot);document.body.append(box);
-  $('.acts').prepend(btn);
-  function ui(){btn.textContent=playing?'Pausar música':'Poner música';btn.setAttribute('aria-pressed',String(playing));box.classList.toggle('off',!playing);}
+  var auto=window.BRC_AUTOPLAY!==false,i=0,player=null,ready=false,want=false,playing=false,userPaused=false,started=false,errs=0,failed=false,vol=60;
+  try{var sv=localStorage.getItem('brc-vol');if(sv!==null&&!isNaN(+sv))vol=clamp(+sv,0,100);}catch(e){}
+  function ic(d){return '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="'+d+'"/></svg>';}
+  var I_PLAY=ic('M8 5v14l11-7z'),I_PAUSE=ic('M6 5h4v14H6zM14 5h4v14h-4z'),I_PREV=ic('M6 6h2v12H6zM9.5 12L18 6v12z'),I_NEXT=ic('M16 6h2v12h-2zM6 18V6l8.5 6z'),
+      I_VOL='<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9zM16.5 12A4.5 4.5 0 0014 8v8a4.5 4.5 0 002.5-4z"/></svg>';
+  function ib(h,lab,fn,c){var b=mk('button',c||'');b.type='button';b.innerHTML=h;b.setAttribute('aria-label',lab);b.addEventListener('click',fn);return b;}
+  var bar=mk('div','mbar'),inn=mk('div','in');bar.setAttribute('role','region');bar.setAttribute('aria-label','Música del libro');
+  var prev=ib(I_PREV,'Canción anterior',function(){skip(-1);}),
+      pp=ib(I_PLAY,'Poner música',function(){if(playing)stop();else go();},'pp'),
+      next=ib(I_NEXT,'Canción siguiente',function(){skip(1);}),
+      tt=mk('div','tt','Música del libro'),vb=mk('div','vol'),rg=document.createElement('input');
+  rg.type='range';rg.min=0;rg.max=100;rg.value=String(vol);rg.setAttribute('aria-label','Volumen');
+  var vi=mk('span');vi.innerHTML=I_VOL;vb.append(vi,rg);
+  inn.append(pp,prev,next,tt,vb);bar.append(inn);
+  var off=mk('div','ytoff'),slot=mk('div');slot.id='ytslot';off.append(slot);
+  document.body.append(bar,off);document.body.classList.add('hasbar');
+  function ui(){pp.innerHTML=playing?I_PAUSE:I_PLAY;pp.setAttribute('aria-label',playing?'Pausar música':'Poner música');}
+  function setTitle(){try{var d=player.getVideoData();if(d&&d.title)tt.textContent=d.title;}catch(e){}}
   function load(n){
     i=(n+L.length)%L.length;var t=L[i],o={videoId:t.id};
     if(+t.start>0)o.startSeconds=+t.start;if(+t.end>0)o.endSeconds=+t.end;
-    player.loadVideoById(o);
+    player.loadVideoById(o);setTimeout(setTitle,700);
   }
   function go(){
     if(failed){toast('No se pudo cargar la música. Revisá tu conexión');return;}
-    if(!ready){want=true;return;}
+    if(!ready){want=true;toast('Cargando la música…');return;}
     userPaused=false;
     if(!started){started=true;load(i);}else player.playVideo();
   }
   function stop(){want=false;userPaused=true;if(ready)player.pauseVideo();playing=false;ui();}
+  function skip(d){
+    if(failed){toast('No se pudo cargar la música. Revisá tu conexión');return;}
+    if(!ready){toast('Cargando la música…');return;}
+    userPaused=false;started=true;load(i+d);
+  }
+  rg.addEventListener('input',function(){
+    vol=+rg.value;if(ready)player.setVolume(vol);
+    try{localStorage.setItem('brc-vol',String(vol));}catch(e){}
+  });
   function init(){
     if(player||!window.YT||!window.YT.Player)return;
-    player=new window.YT.Player('ytslot',{width:'100%',height:'100%',playerVars:{playsinline:1,rel:0},events:{
-      onReady:function(){ready=true;if(want){want=false;go();}},
+    player=new window.YT.Player('ytslot',{width:'200',height:'200',playerVars:{playsinline:1,rel:0,controls:0},events:{
+      onReady:function(){ready=true;try{player.setVolume(vol);}catch(e){}if(want){want=false;go();}},
       onStateChange:function(e){
-        if(e.data===1){playing=true;errs=0;ui();}
+        if(e.data===1){playing=true;errs=0;ui();setTitle();}
         else if(e.data===2){playing=false;ui();}
+        else if(e.data===3){setTitle();}
         else if(e.data===0){load(i+1);}
       },
       onError:function(){errs++;if(errs>=L.length){playing=false;ui();toast('No se pudo reproducir la música');return;}load(i+1);}
     }});
   }
-  btn.addEventListener('click',function(){if(playing)stop();else go();});
   function first(e){
-    if(e.target.closest&&e.target.closest('.acts'))return;
+    if(e.target.closest&&e.target.closest('.mbar'))return;
     document.removeEventListener('click',first,true);
     if(auto&&!userPaused)go();
   }
@@ -522,7 +555,7 @@ $('#btn-sign').addEventListener('click',openPad);
 $('#btn-pdf').addEventListener('click',exportPdf);
 var STANDALONE=!(window.claude&&window.claude.use);
 if(STANDALONE){
-  /* Fuera de Claude: las firmas recibidas se leen de firmas.txt (un código por línea). */
+ 
   fetch('firmas.txt',{cache:'no-cache'}).then(function(r){return r.ok?r.text():'';}).then(function(t){
     var n=0;t.split(/\s+/).forEach(function(l){var m=l.indexOf('BRC1:')===0?dec(l):null;if(!m)return;
       if(!S.marks.some(function(x){return x.d===m.d&&x.p===m.p&&x.n===m.n;})){S.marks.push(m);n++;}});
